@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+// Documento temporal para extracción con IA
+model Document {
+  id          String          @id @default(cuid())
+  enterpriseId  String
+  uploadedBy  String
+  filename    String
+  mimetype    String
+  fileSize    Int
+  notes       String?
+  status      DocumentStatus  @default(PENDING)
+  errorReason String?
+  processedAt DateTime?
+  fileData    Bytes?
+  invoiceId   String?         // ID de la factura creada en Suppliers
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  extraction  Extraction?
+
+  @@index([enterpriseId])
+  @@index([status])
+  @@index([invoiceId])
+}
+
+// Extracción temporal de la IA (se mapea a Invoice después)
+model Extraction {
+  id             String      @id @default(cuid())
+  document       Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId     String      @unique
+  supplierName   String?
+  supplierTaxId  String?
+  invoiceNumber  String?
+  issueDate      DateTime?
+  totalAmount    Decimal?
+  taxAmount      Decimal?
+  currency       String?
+  rawResponse    Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  lineItems      LineItem[]
+}
+
+model LineItem {
+  id           String     @id @default(cuid())
+  extraction   Extraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  extractionId String
+  description  String?
+  quantity     Decimal?
+  unitPrice    Decimal?
+  total        Decimal?
+  createdAt    DateTime   @default(now())
+
+  @@index([extractionId])
+}
