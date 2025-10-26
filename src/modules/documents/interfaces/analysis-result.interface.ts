@@ -1,5 +1,6 @@
 export interface ExtractedLineItem {
   description: string | null;
+  productCode: string | null;
   quantity: number | null;
   unitPrice: number | null;
   total: number | null;

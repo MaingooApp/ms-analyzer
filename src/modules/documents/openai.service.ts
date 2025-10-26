@@ -191,6 +191,7 @@ export class OpenAiService {
 
         return {
           description: normalizeText(producto.descripcion),
+          productCode: normalizeText(producto.referencia),
           quantity,
           unitPrice,
           total: computedTotal,
@@ -199,6 +200,7 @@ export class OpenAiService {
       .filter(
         (line) =>
           line.description !== null ||
+          line.productCode !== null ||
           line.quantity !== null ||
           line.unitPrice !== null ||
           line.total !== null,

@@ -4,7 +4,6 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 import { AnalyzerEvents, envs, NATS_SERVICE } from 'src/config';
 import { SubmitDocumentDto, GetDocumentDto } from './dto';
-import { OpenAiService } from './openai.service';
 import type { ExtractionResult } from './interfaces';
 import { AzureDocIntelService } from './azure-docintelligence.service';
 
@@ -15,7 +14,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   private activeJobs = 0;
 
   constructor(
-    private readonly openAiService: OpenAiService,
     @Inject(NATS_SERVICE) private readonly client: ClientProxy,
     private readonly azureDocIntel: AzureDocIntelService,
   ) {
@@ -171,72 +169,84 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   }
 
   private async processDocument(documentId: string): Promise<void> {
-    // ...
+    const document = await this.document.findUnique({ where: { id: documentId } });
+
+    if (!document) {
+      this.logger.warn(`Document ${documentId} not found, skipping`);
+      return;
+    }
+
     await this.document.update({
       where: { id: documentId },
       data: { status: 'PROCESSING', errorReason: null },
     });
 
-    const buffer = Buffer.from(document.fileData);
-    const mimetype = document.mimetype || 'application/pdf';
+    try {
+      if (!document.fileData) {
+        throw new Error('El documento no contiene datos binarios para procesar');
+      }
 
-    // 1) Azure primero
-    const az = await this.azureDocIntel.analyzeInvoiceFromBuffer(buffer, mimetype);
+      const buffer = Buffer.from(document.fileData);
+      const mimetype = document.mimetype || 'application/pdf';
 
-    let extraction = az && {
-      supplierName: az.supplierName,
-      supplierTaxId: az.supplierTaxId,
-      invoiceNumber: az.invoiceNumber,
-      issueDate: az.issueDate,
-      total: az.total,
-      taxes: az.taxes,
-      currency: (az.currency ?? 'EUR').toUpperCase(),
-      lines: az.lines.map((l) => ({
-        description: l.description,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        total: l.total,
-      })),
-    };
+      const az = await this.azureDocIntel.analyzeInvoiceFromBuffer(buffer, mimetype);
+      if (!az) {
+        throw new Error('Azure Document Intelligence no devolvió resultados');
+      }
 
-    // Heurística de completitud (ajústala a tu gusto)
-    const needsFallback =
-      !extraction ||
-      extraction.total === null ||
-      (!extraction.invoiceNumber && !extraction.issueDate && !extraction.supplierName);
+      const extraction: ExtractionResult = {
+        supplierName: az.supplierName,
+        supplierTaxId: az.supplierTaxId,
+        invoiceNumber: az.invoiceNumber,
+        issueDate: az.issueDate,
+        total: az.total,
+        taxes: az.taxes,
+        currency: (az.currency ?? 'EUR').toUpperCase(),
+        lines: az.lines.map((line) => ({
+          description: line.description,
+          productCode: line.productCode,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          total: line.total,
+        })),
+      };
 
-    // 2) Fallback a OpenAI SOLO si está activado por env y hace falta
-    if (envs.useOpenAiFallback && needsFallback) {
-      extraction = await this.openAiService.extractInvoice({
-        buffer,
-        filename: document.filename,
-        mimetype,
-        notes: document.notes ?? undefined,
+      await this.persistExtraction(documentId, extraction);
+
+      await this.document.update({
+        where: { id: documentId },
+        data: { status: 'DONE', processedAt: new Date(), errorReason: null },
+      });
+
+      this.client.emit(AnalyzerEvents.analyzed, {
+        documentId,
+        enterpriseId: document.enterpriseId,
+        extraction: {
+          supplierName: extraction.supplierName,
+          supplierTaxId: extraction.supplierTaxId,
+          invoiceNumber: extraction.invoiceNumber,
+          issueDate: extraction.issueDate,
+          totalAmount: extraction.total,
+          taxAmount: extraction.taxes,
+          currency: extraction.currency,
+          lines: extraction.lines,
+        },
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(`Failed to process document ${documentId}`, err);
+
+      await this.document.update({
+        where: { id: documentId },
+        data: { status: 'FAILED', errorReason: err.message },
+      });
+
+      this.client.emit(AnalyzerEvents.failed, {
+        documentId,
+        enterpriseId: document.enterpriseId,
+        reason: err.message,
       });
     }
-
-    // Persistir
-    await this.persistExtraction(documentId, extraction!);
-
-    await this.document.update({
-      where: { id: documentId },
-      data: { status: 'DONE', processedAt: new Date(), errorReason: null },
-    });
-
-    this.client.emit(AnalyzerEvents.analyzed, {
-      documentId,
-      enterpriseId: document.enterpriseId,
-      extraction: {
-        supplierName: extraction!.supplierName,
-        supplierTaxId: extraction!.supplierTaxId,
-        invoiceNumber: extraction!.invoiceNumber,
-        issueDate: extraction!.issueDate,
-        totalAmount: extraction!.total,
-        taxAmount: extraction!.taxes,
-        currency: extraction!.currency,
-        lines: extraction!.lines,
-      },
-    });
   }
 
   private async persistExtraction(documentId: string, extraction: ExtractionResult) {

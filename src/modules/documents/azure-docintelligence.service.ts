@@ -38,6 +38,7 @@ export type AzureInvoiceExtraction = {
   // --- Líneas ---
   lines: Array<{
     description: string | null;
+    productCode: string | null;
     quantity: number | null;
     unitPrice: number | null;
     total: number | null;
@@ -124,7 +125,7 @@ export class AzureDocIntelService {
       const dateI = (f?: DF | null) => (f?.valueDate ? new Date(f.valueDate).toISOString() : null);
       const curr = (f?: DF | null) => f?.valueCurrency?.amount ?? null;
       const obj = (f?: DF | null) => f?.valueObject ?? null;
-      const arr = (f?: DF | null) => f?.valueArray ?? null;
+      const arr = (f?: DF | null): DF[] | null => f?.valueArray ?? null;
 
       const fields = doc.fields as Record<string, DF>;
 
@@ -173,10 +174,11 @@ export class AzureDocIntelService {
 
       // --- Líneas ---
       const items = arr(fields['Items']) ?? [];
-      const lines = items.map((item) => {
-        const o = obj(item) ?? {};
+      const lines = items.map((item: DF) => {
+        const o = obj(item) ?? ({} as Record<string, DF>);
         return {
           description: str(o['Description']),
+          productCode: str(o['ProductCode']),
           quantity: num(o['Quantity']),
           unitPrice: curr(o['UnitPrice']) ?? num(o['UnitPrice']),
           total: curr(o['Amount']) ?? num(o['Amount']),

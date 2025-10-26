@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "Node16",
+    "moduleResolution": "node16",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -21,7 +22,11 @@
     "skipLibCheck": true,
     "types": ["node", "jest"],
     "paths": {
-      "src/*": ["src/*"]
+      "src/*": ["src/*"],
+      "@azure-rest/ai-document-intelligence": [
+        "node_modules/@azure-rest/ai-document-intelligence/dist/commonjs/index"
+      ],
+      "@azure/core-auth": ["node_modules/@azure/core-auth/dist/commonjs/index"]
     }
   },
   "include": ["src", "test"],
