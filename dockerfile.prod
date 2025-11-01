@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 RUN pnpm install --frozen-lockfile
 
 
@@ -16,6 +16,9 @@ RUN pnpm install --frozen-lockfile
 FROM node:21-alpine3.19 as build
 
 WORKDIR /usr/src/app
+
+# Habilitar pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 # Copiar de deps, los módulos de node
 COPY --from=deps /usr/src/app/node_modules ./node_modules
