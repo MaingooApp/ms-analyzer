@@ -41,6 +41,8 @@ FROM node:20-alpine3.19 as prod
 
 WORKDIR /usr/src/app
 
+# Habilitar pnpm para poder ejecutar comandos de prisma
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 COPY --from=build /usr/src/app/node_modules ./node_modules
 
