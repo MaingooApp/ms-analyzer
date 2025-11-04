@@ -61,7 +61,7 @@ jobs:
       - name: 🚀 Update Container App
         run: |
           az containerapp update \
-            --name maingoo-${{ env.SERVICE_NAME }} \
+            --name ms-${{ env.SERVICE_NAME }} \
             --resource-group maingoo-back \
             --image ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
 
