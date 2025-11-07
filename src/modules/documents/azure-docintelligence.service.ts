@@ -229,8 +229,32 @@ export class AzureDocIntelService {
 
       return extraction;
     } catch (e: any) {
-      this.logger.error(e?.message || e);
-      throw new InternalServerErrorException('Azure Document Intelligence error');
+      // Extraer mensaje de error más específico
+      let errorMessage = 'Azure Document Intelligence error';
+
+      if (e?.message) {
+        errorMessage = e.message;
+      } else if (e?.body?.error?.message) {
+        errorMessage = e.body.error.message;
+      } else if (typeof e === 'string') {
+        errorMessage = e;
+      }
+
+      // Detectar si es error de rate limit (429)
+      const isRateLimitError =
+        errorMessage.includes('429') ||
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('call rate limit');
+
+      if (isRateLimitError) {
+        this.logger.error(`Rate limit exceeded: ${errorMessage}`);
+        throw new InternalServerErrorException(
+          'Azure rate limit exceeded. Please wait and try again or upgrade to a paid tier.',
+        );
+      }
+
+      this.logger.error(`Azure Document Intelligence error: ${errorMessage}`);
+      throw new InternalServerErrorException(errorMessage);
     }
   }
 }
