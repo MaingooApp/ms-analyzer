@@ -234,17 +234,27 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       });
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
+
+      // Extraer mensaje más específico si viene de HttpException de NestJS
+      let errorMessage = err.message;
+      if ((error as any)?.response?.message) {
+        errorMessage = (error as any).response.message;
+      }
+
       this.logger.error(`Failed to process document ${documentId}`, err);
 
       await this.document.update({
         where: { id: documentId },
-        data: { status: 'FAILED', errorReason: err.message },
+        data: {
+          status: 'FAILED',
+          errorReason: errorMessage.substring(0, 500), // Limitar longitud del mensaje
+        },
       });
 
       this.client.emit(AnalyzerEvents.failed, {
         documentId,
         enterpriseId: document.enterpriseId,
-        reason: err.message,
+        reason: errorMessage,
       });
     }
   }
