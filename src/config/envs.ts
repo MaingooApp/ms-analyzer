@@ -12,6 +12,8 @@ interface EnvVars {
   PROCESSING_CONCURRENCY: number;
   DOCINTEL_KEY: string;
   DOCINTEL_ENDPOINT: string;
+  AZURE_STORAGE_CONNECTION_STRING: string;
+  AZURE_DOCUMENTS_CONTAINER: string;
 }
 
 const envSchema = joi
@@ -30,6 +32,8 @@ const envSchema = joi
     PROCESSING_CONCURRENCY: joi.number().integer().min(1).default(2),
     DOCINTEL_KEY: joi.string().required(),
     DOCINTEL_ENDPOINT: joi.string().uri().required(),
+    AZURE_STORAGE_CONNECTION_STRING: joi.string().required(),
+    AZURE_DOCUMENTS_CONTAINER: joi.string().default('invoices'),
   })
   .unknown(true);
 
@@ -55,4 +59,6 @@ export const envs = {
   processingConcurrency: envVars.PROCESSING_CONCURRENCY,
   DOCINTEL_KEY: envVars.DOCINTEL_KEY,
   DOCINTEL_ENDPOINT: envVars.DOCINTEL_ENDPOINT,
+  azureStorageConnectionString: envVars.AZURE_STORAGE_CONNECTION_STRING,
+  documentsContainerName: envVars.AZURE_DOCUMENTS_CONTAINER,
 };
