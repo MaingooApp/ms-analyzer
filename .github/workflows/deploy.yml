@@ -12,6 +12,9 @@ env:
   SERVICE_NAME: documents-analyzer
   TARGET_PORT: 3002
   IMAGE_TAG: ${{ github.sha }}
+  ACR_LOGIN_SERVER: maingooregistry.azurecr.io
+  RESOURCE_GROUP: maingoo-back
+  CONTAINER_APP_NAME: ms-analyzer
 
 jobs:
   build-and-push:
@@ -25,22 +28,22 @@ jobs:
       - name: 🔐 Login to Azure Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
           password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
 
       - name: 🏗️ Build Docker image
         run: |
           docker build \
-            -t ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }} \
-            -t ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:latest \
+            -t ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:latest \
             -f dockerfile.prod \
             .
 
       - name: 📤 Push Docker image
         run: |
-          docker push ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:latest
+          docker push ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:latest
 
       - name: ✅ Build completed
         run: |
@@ -58,14 +61,34 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: 🚀 Update Container App
+      - name: 📦 Install Azure Container Apps extension
+        run: az extension add -n containerapp --upgrade
+
+      - name: 🔑 Ensure ACR credentials on Container App
+        run: |
+          az containerapp registry set \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server ${{ env.ACR_LOGIN_SERVER }} \
+            --username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
+            --password ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+      - name: 🚀 Deploy new revision with new image
         run: |
           az containerapp update \
-            --name ms-analyzer \
-            --resource-group maingoo-back \
-            --image ${{ env.AZURE_REGISTRY_NAME }}.azurecr.io/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }} \
+            --revision-suffix ${{ github.run_number }}-${{ github.run_attempt }}
+
+      - name: 📋 Show active revision
+        run: |
+          az containerapp revision list \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?properties.active==\`true\`].{name:name,image:properties.template.containers[0].image}" -o table
 
       - name: ✅ Deployment successful
         run: |
           echo "✅ Service maingoo-${{ env.SERVICE_NAME }} deployed successfully!"
-          echo "🔗 View logs: az containerapp logs show --name maingoo-${{ env.SERVICE_NAME }} --resource-group maingoo-back --follow"
+          echo "🔗 View logs: az containerapp logs show --name ${{ env.CONTAINER_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --follow"
