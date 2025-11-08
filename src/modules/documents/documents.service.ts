@@ -6,6 +6,7 @@ import { AnalyzerEvents, envs, NATS_SERVICE } from 'src/config';
 import { SubmitDocumentDto, GetDocumentDto } from './dto';
 import type { ExtractionResult } from './interfaces';
 import { AzureDocIntelService } from './azure-docintelligence.service';
+import { AzureBlobService } from './azure-blob.service';
 
 @Injectable()
 export class DocumentsService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -16,6 +17,7 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   constructor(
     @Inject(NATS_SERVICE) private readonly client: ClientProxy,
     private readonly azureDocIntel: AzureDocIntelService,
+    private readonly azureBlob: AzureBlobService,
   ) {
     super();
   }
@@ -189,6 +191,15 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       const buffer = Buffer.from(document.fileData);
       const mimetype = document.mimetype || 'application/pdf';
 
+      this.logger.log(`📤 Uploading document ${documentId} to blob storage...`);
+      const blobName = await this.azureBlob.uploadDocument(
+        documentId,
+        buffer,
+        mimetype,
+        document.filename,
+      );
+
+      this.logger.log(`🔍 Analyzing document ${documentId} with Azure DI...`);
       const az = await this.azureDocIntel.analyzeInvoiceFromBuffer(buffer, mimetype);
       if (!az) {
         throw new Error('Azure Document Intelligence no devolvió resultados');
@@ -215,12 +226,21 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
 
       await this.document.update({
         where: { id: documentId },
-        data: { status: 'DONE', processedAt: new Date(), errorReason: null },
+        data: {
+          status: 'DONE',
+          processedAt: new Date(),
+          errorReason: null,
+          blobName,
+          fileData: null,
+        },
       });
+
+      this.logger.log(`✅ Document ${documentId} processed and stored successfully`);
 
       this.client.emit(AnalyzerEvents.analyzed, {
         documentId,
         enterpriseId: document.enterpriseId,
+        blobName,
         extraction: {
           supplierName: extraction.supplierName,
           supplierTaxId: extraction.supplierTaxId,

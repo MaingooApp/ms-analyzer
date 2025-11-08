@@ -27,6 +27,7 @@ model Document {
   errorReason String?
   processedAt DateTime?
   fileData    Bytes?
+  blobName    String?         // Referencia al archivo en Azure Blob Storage
   invoiceId   String?         // ID de la factura creada en Suppliers
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
