@@ -78,8 +78,7 @@ jobs:
           az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }} \
-            --revision-suffix ${{ github.run_number }}-${{ github.run_attempt }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/maingoo-${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: 📋 Show active revision
         run: |
