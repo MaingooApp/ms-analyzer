@@ -17,6 +17,7 @@ const natsOptions: NatsOptions = {
     reconnectTimeWait: 2000,
     timeout: 5000,
     name: 'ms-analyzer',
+    maxPayload: 20 * 1024 * 1024,
   },
 };
 
