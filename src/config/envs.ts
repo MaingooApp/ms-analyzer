@@ -6,10 +6,10 @@ interface EnvVars {
   NATS_SERVERS: string[];
   DATABASE_URL: string;
   PROCESSING_CONCURRENCY: number;
-  DOCINTEL_KEY: string;
-  DOCINTEL_ENDPOINT: string;
   AZURE_STORAGE_CONNECTION_STRING: string;
   AZURE_DOCUMENTS_CONTAINER: string;
+  CU_ENDPOINT: string;
+  CU_KEY: string;
 }
 
 const envSchema = joi
@@ -22,9 +22,9 @@ const envSchema = joi
       .pattern(/^postgres(?:ql)?:/i, { name: 'PostgreSQL connection string' })
       .required(),
     PROCESSING_CONCURRENCY: joi.number().integer().min(1).default(2),
-    DOCINTEL_KEY: joi.string().required(),
-    DOCINTEL_ENDPOINT: joi.string().uri().required(),
     AZURE_STORAGE_CONNECTION_STRING: joi.string().required(),
+    CU_ENDPOINT: joi.string().required(),
+    CU_KEY: joi.string().required(),
     AZURE_DOCUMENTS_CONTAINER: joi.string().default('invoices'),
   })
   .unknown(true);
@@ -45,8 +45,8 @@ export const envs = {
   natsServers: envVars.NATS_SERVERS,
   databaseUrl: envVars.DATABASE_URL,
   processingConcurrency: envVars.PROCESSING_CONCURRENCY,
-  DOCINTEL_KEY: envVars.DOCINTEL_KEY,
-  DOCINTEL_ENDPOINT: envVars.DOCINTEL_ENDPOINT,
   azureStorageConnectionString: envVars.AZURE_STORAGE_CONNECTION_STRING,
   documentsContainerName: envVars.AZURE_DOCUMENTS_CONTAINER,
+  cuEndpoint: envVars.CU_ENDPOINT,
+  cuKey: envVars.CU_KEY,
 };

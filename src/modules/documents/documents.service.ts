@@ -206,19 +206,24 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       }
 
       const extraction: ExtractionResult = {
-        supplierName: az.supplierName,
-        supplierTaxId: az.supplierTaxId,
-        invoiceNumber: az.invoiceNumber,
-        issueDate: az.issueDate,
-        total: az.total,
-        taxes: az.taxes,
-        currency: (az.currency ?? 'EUR').toUpperCase(),
-        lines: az.lines.map((line) => ({
-          description: line.description,
-          productCode: line.productCode,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          total: line.total,
+        supplierName: az.CompanyAddress,
+        supplierTaxId: az.CompanyTaxId,
+        invoiceNumber: az.InvoiceNumber,
+        issueDate: az.SaleDate,
+        total: az.TotalAmount,
+        taxes: az.TotalTaxAmount,
+        currency: 'EUR',
+        lines: az.Items.map((line) => ({
+          ProductCode: line.ProductCode,
+          ProductDescription: line.ProductDescription,
+          ProductUnit: line.ProductUnit,
+          UnitPrice: line.UnitPrice,
+          UnitCount: line.UnitCount,
+          LinePrice: line.LinePrice,
+          Quantity: line.Quantity,
+          LineAmount: line.LineAmount,
+          TaxIndicator: line.TaxIndicator,
+          DiscountCode: line.DiscountCode,
         })),
       };
 
@@ -312,10 +317,10 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         await tx.lineItem.createMany({
           data: extraction.lines.map((line) => ({
             extractionId: record.id,
-            description: line.description ?? undefined,
-            quantity: this.toDecimal(line.quantity),
-            unitPrice: this.toDecimal(line.unitPrice),
-            total: this.toDecimal(line.total),
+            description: line.ProductDescription,
+            quantity: this.toDecimal(line.Quantity),
+            unitPrice: this.toDecimal(line.UnitPrice),
+            total: this.toDecimal(line.LineAmount),
           })),
         });
       }

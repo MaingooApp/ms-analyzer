@@ -1,9 +1,15 @@
 export interface ExtractedLineItem {
-  description: string | null;
-  productCode: string | null;
-  quantity: number | null;
-  unitPrice: number | null;
-  total: number | null;
+  ProductCode: string | null;
+  ProductDescription: string | null;
+  ProductUnit: string | null;
+  UnitPrice: number | null;
+  UnitCount: string | null;
+  LinePrice: number | null;
+  Quantity: number | null;
+  LineAmount: number | null;
+  TaxIndicator: string | null;
+  DiscountCode: string | null;
+  AdditionalReference?: string | null;
 }
 
 export interface ExtractionResult {
