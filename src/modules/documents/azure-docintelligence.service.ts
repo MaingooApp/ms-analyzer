@@ -143,7 +143,6 @@ export class AzureDocIntelService {
       if (!content) return null;
 
       const fields = content.fields as Record<string, CUField>;
-      console.log(fields);
 
       const str = (f?: CUField) => f?.valueString ?? null;
       const num = (f?: CUField) => {

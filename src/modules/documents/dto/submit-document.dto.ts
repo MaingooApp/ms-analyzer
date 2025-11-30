@@ -1,4 +1,5 @@
-import { IsBase64, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBase64, IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class SubmitDocumentDto {
   @IsBase64()
@@ -10,10 +11,12 @@ export class SubmitDocumentDto {
   @IsString()
   mimetype!: string;
 
-  @IsOptional()
   @IsString()
-  @MaxLength(500)
-  notes?: string;
+  documentType!: string;
+
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  hasDeliveryNotes!: boolean;
 
   @IsString()
   uploadedBy!: string;
