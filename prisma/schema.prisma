@@ -22,7 +22,8 @@ model Document {
   filename    String
   mimetype    String
   fileSize    Int
-  notes       String?
+  documentType    String?
+  hasDeliveryNotes Boolean @default(false)
   status      DocumentStatus  @default(PENDING)
   errorReason String?
   processedAt DateTime?

@@ -4,18 +4,21 @@ CREATE TYPE "DocumentStatus" AS ENUM ('PENDING', 'PROCESSING', 'DONE', 'FAILED')
 -- CreateTable
 CREATE TABLE "Document" (
     "id" TEXT NOT NULL,
-    "businessId" TEXT NOT NULL,
+    "enterpriseId" TEXT NOT NULL,
     "uploadedBy" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
     "mimetype" TEXT NOT NULL,
     "fileSize" INTEGER NOT NULL,
-    "notes" TEXT,
+    "documentType" TEXT,
+    "hasDeliveryNotes" BOOLEAN NOT NULL,
     "status" "DocumentStatus" NOT NULL DEFAULT 'PENDING',
     "errorReason" TEXT,
     "processedAt" TIMESTAMP(3),
     "fileData" BYTEA,
+    "blobName" TEXT,
+    "invoiceId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Document_pkey" PRIMARY KEY ("id")
 );
@@ -33,7 +36,7 @@ CREATE TABLE "Extraction" (
     "currency" TEXT,
     "rawResponse" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Extraction_pkey" PRIMARY KEY ("id")
 );
@@ -50,6 +53,15 @@ CREATE TABLE "LineItem" (
 
     CONSTRAINT "LineItem_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE INDEX "Document_enterpriseId_idx" ON "Document"("enterpriseId");
+
+-- CreateIndex
+CREATE INDEX "Document_status_idx" ON "Document"("status");
+
+-- CreateIndex
+CREATE INDEX "Document_invoiceId_idx" ON "Document"("invoiceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Extraction_documentId_key" ON "Extraction"("documentId");
