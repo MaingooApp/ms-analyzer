@@ -1,8 +1,9 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 import { Prisma, PrismaClient } from '@prisma/client';
 
-import { AnalyzerEvents, envs, NATS_SERVICE } from 'src/config';
+import { AnalyzerEvents, envs, NATS_SERVICE, SuppliersSubjects } from 'src/config';
 import { SubmitDocumentDto, GetDocumentDto } from './dto';
 import type { ExtractionResult } from './interfaces';
 import { AzureDocIntelService } from './azure-docintelligence.service';
@@ -207,6 +208,20 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         throw new Error('Azure Document Intelligence no devolvió resultados');
       }
 
+      if (az.InvoiceNumber && document.documentType) {
+        const invoiceExists = await this.checkInvoiceExists(
+          az.InvoiceNumber,
+          document.documentType,
+          document.enterpriseId,
+        );
+
+        if (invoiceExists.exists) {
+          throw new Error(
+            `El documento ${document.documentType} con número ${az.InvoiceNumber} ya existe`,
+          );
+        }
+      }
+
       const extraction: ExtractionResult = {
         supplierName: az.CompanyAddress,
         supplierTaxId: az.CompanyTaxId,
@@ -279,12 +294,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
           errorReason: errorMessage.substring(0, 500), // Limitar longitud del mensaje
         },
       });
-
-      this.client.emit(AnalyzerEvents.failed, {
-        documentId,
-        enterpriseId: document.enterpriseId,
-        reason: errorMessage,
-      });
     }
   }
 
@@ -343,6 +352,25 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
 
     for (const doc of pending) {
       this.enqueue(doc.id);
+    }
+  }
+
+  private async checkInvoiceExists(
+    invoiceNumber: string,
+    documentType: string,
+    enterpriseId: string,
+  ): Promise<{ exists: boolean; invoiceId?: string }> {
+    try {
+      const result = await firstValueFrom(
+        this.client.send<{ exists: boolean; invoiceId?: string }>(
+          SuppliersSubjects.checkInvoiceExists,
+          { invoiceNumber, documentType, enterpriseId },
+        ),
+      );
+      return result;
+    } catch (error) {
+      this.logger.warn(`No se pudo verificar si la factura existe: ${error}`);
+      return { exists: false };
     }
   }
 
