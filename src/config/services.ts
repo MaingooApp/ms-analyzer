@@ -8,9 +8,12 @@ export const AnalyzerSubjects = {
 
 export const AnalyzerEvents = {
   analyzed: 'documents.analyzed',
-  failed: 'documents.analysis.failed',
 } as const;
 
 export const SuppliersEvents = {
   invoiceProcessed: 'suppliers.invoice.processed',
+} as const;
+
+export const SuppliersSubjects = {
+  checkInvoiceExists: 'invoices.checkExists',
 } as const;
