@@ -3,8 +3,7 @@ name: Build and Deploy Documents Analyzer to Azure
 on:
   push:
     branches:
-      - main
-      - master
+      - production
   workflow_dispatch:
 
 env:
