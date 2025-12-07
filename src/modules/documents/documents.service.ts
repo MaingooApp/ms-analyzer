@@ -203,7 +203,8 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       );
 
       this.logger.log(`🔍 Analyzing document ${documentId} with Azure DI...`);
-      const az = await this.azureDocIntel.analyzeInvoiceFromBuffer(buffer, mimetype);
+      const documentsUrl = await this.azureBlob.getDocumentUrl(blobName);
+      const az = await this.azureDocIntel.analyzeInvoiceFromBuffer(buffer, mimetype, documentsUrl);
       if (!az) {
         throw new Error('Azure Document Intelligence no devolvió resultados');
       }
