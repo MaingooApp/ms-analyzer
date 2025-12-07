@@ -85,6 +85,7 @@ export class AzureDocIntelService {
   async analyzeInvoiceFromBuffer(
     buffer: Buffer,
     mimetype = 'application/pdf',
+    documentUrl: string,
   ): Promise<AzureInvoiceExtraction | null> {
     try {
       const url = `${this.endpoint}/contentunderstanding/analyzers/Analyzer1:analyze?api-version=2025-11-01`;
@@ -92,9 +93,7 @@ export class AzureDocIntelService {
       const body = {
         inputs: [
           {
-            name: 'invoice',
-            data: buffer.toString('base64'),
-            mimeType: mimetype,
+            url: documentUrl,
           },
         ],
       };
