@@ -88,7 +88,7 @@ export class AzureDocIntelService {
     documentUrl: string,
   ): Promise<AzureInvoiceExtraction | null> {
     try {
-      const url = `${this.endpoint}/contentunderstanding/analyzers/Analyzer1:analyze?api-version=2025-11-01`;
+      const url = `${this.endpoint}/contentunderstanding/analyzers/Analizer_GA:analyze?api-version=2025-11-01`;
 
       const body = {
         inputs: [
