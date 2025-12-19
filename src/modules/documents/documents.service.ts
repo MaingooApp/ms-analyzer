@@ -110,10 +110,17 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
               currency: document.extraction.currency,
               lines: document.extraction.lineItems.map((item) => ({
                 id: item.id,
+                productCode: item.productCode,
                 description: item.description,
+                productUnit: item.productUnit,
+                unitCount: item.unitCount,
                 quantity: item.quantity?.toNumber() ?? null,
                 unitPrice: item.unitPrice?.toNumber() ?? null,
+                linePrice: item.linePrice?.toNumber() ?? null,
                 total: item.total?.toNumber() ?? null,
+                taxIndicator: item.taxIndicator,
+                discountCode: item.discountCode,
+                additionalReference: item.additionalReference,
               })),
             }
           : null,
@@ -224,7 +231,7 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       }
 
       const extraction: ExtractionResult = {
-        supplierName: az.CompanyAddress,
+        supplierName: az.CompanyName,
         supplierTaxId: az.CompanyTaxId,
         invoiceNumber: az.InvoiceNumber,
         issueDate: az.SaleDate,
@@ -331,10 +338,17 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         await tx.lineItem.createMany({
           data: extraction.lines.map((line) => ({
             extractionId: record.id,
+            productCode: line.ProductCode,
             description: line.ProductDescription,
+            productUnit: line.ProductUnit,
+            unitCount: line.UnitCount,
             quantity: this.toDecimal(line.Quantity),
             unitPrice: this.toDecimal(line.UnitPrice),
+            linePrice: this.toDecimal(line.LinePrice),
             total: this.toDecimal(line.LineAmount),
+            taxIndicator: line.TaxIndicator,
+            discountCode: line.DiscountCode,
+            additionalReference: line.AdditionalReference,
           })),
         });
       }
