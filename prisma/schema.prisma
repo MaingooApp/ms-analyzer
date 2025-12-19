@@ -60,14 +60,21 @@ model Extraction {
 }
 
 model LineItem {
-  id           String     @id @default(cuid())
-  extraction   Extraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
-  extractionId String
-  description  String?
-  quantity     Decimal?
-  unitPrice    Decimal?
-  total        Decimal?
-  createdAt    DateTime   @default(now())
+  id                  String     @id @default(cuid())
+  extraction          Extraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  extractionId        String
+  productCode         String?
+  description         String?
+  productUnit         String?
+  unitCount           String?
+  quantity            Decimal?
+  unitPrice           Decimal?
+  linePrice           Decimal?
+  total               Decimal?
+  taxIndicator        String?
+  discountCode        String?
+  additionalReference String?
+  createdAt           DateTime   @default(now())
 
   @@index([extractionId])
 }
