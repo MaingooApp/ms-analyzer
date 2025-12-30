@@ -49,8 +49,8 @@ model Extraction {
   supplierTaxId  String?
   invoiceNumber  String?
   issueDate      DateTime?
-  totalAmount    Decimal?
-  taxAmount      Decimal?
+  totalAmount    Decimal?    @db.Decimal(12, 2)
+  taxAmount      Decimal?    @db.Decimal(12, 2)
   currency       String?
   rawResponse    Json?
   createdAt      DateTime    @default(now())
@@ -67,10 +67,10 @@ model LineItem {
   description         String?
   productUnit         String?
   unitCount           String?
-  quantity            Decimal?
-  unitPrice           Decimal?
-  linePrice           Decimal?
-  total               Decimal?
+  quantity            Decimal?   @db.Decimal(10, 3)
+  unitPrice           Decimal?   @db.Decimal(12, 2)
+  linePrice           Decimal?   @db.Decimal(12, 2)
+  total               Decimal?   @db.Decimal(12, 2)
   taxIndicator        String?
   discountCode        String?
   additionalReference String?

@@ -197,11 +197,13 @@ export class AzureDocIntelService {
       const items = arr(fields['Items']) ?? [];
       extraction.Items = items.map((item) => {
         const o = obj(item) ?? {};
+        const unitPrice = num(o['LinePrice']) ?? num(o['UnitPrice']);
+        
         return {
           ProductCode: str(o['ProductCode']),
           ProductDescription: str(o['ProductDescription']),
           ProductUnit: str(o['ProductUnit']),
-          UnitPrice: num(o['UnitPrice']),
+          UnitPrice: unitPrice,
           UnitCount: str(o['UnitCount']),
           LinePrice: num(o['LinePrice']),
           Quantity: num(o['Quantity']),
