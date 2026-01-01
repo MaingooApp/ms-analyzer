@@ -9,7 +9,8 @@ async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
     transport: Transport.NATS,
     options: {
-      servers: envs.natsServers
+      servers: envs.natsServers,
+      maxPayload: 20 * 1024 * 1024, // 20MB limit
     }
   });
 
