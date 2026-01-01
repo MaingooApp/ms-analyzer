@@ -1,8 +1,8 @@
 import { Transform } from 'class-transformer';
-import { IsBase64, IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class SubmitDocumentDto {
-  @IsBase64()
+  @IsString()
   buffer!: string;
 
   @IsString()
