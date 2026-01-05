@@ -3,8 +3,8 @@ import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { Prisma, PrismaClient } from '@prisma/client';
 
-import { AnalyzerEvents, envs, NATS_SERVICE, SuppliersSubjects } from 'src/config';
-import { SubmitDocumentDto, GetDocumentDto } from './dto';
+import { AnalyzerEvents, NATS_SERVICE, SuppliersSubjects } from 'src/config';
+import { SubmitDocumentDto, GetDocumentDto, SubmitBatchDto } from './dto';
 import type { ExtractionResult } from './interfaces';
 import { AzureDocIntelService } from './azure-docintelligence.service';
 import { AzureBlobService } from './azure-blob.service';
@@ -12,8 +12,6 @@ import { AzureBlobService } from './azure-blob.service';
 @Injectable()
 export class DocumentsService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DocumentsService.name);
-  private readonly queue: string[] = [];
-  private activeJobs = 0;
 
   constructor(
     @Inject(NATS_SERVICE) private readonly client: ClientProxy,
@@ -26,7 +24,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   async onModuleInit() {
     await this.$connect();
     this.logger.log('Database connection established');
-    await this.requeuePending();
   }
 
   async onModuleDestroy() {
@@ -56,9 +53,67 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         },
       });
 
-      this.enqueue(document.id);
+      void this.processDocument(document.id);
 
       return { documentId: document.id };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async submitBatch(payload: SubmitBatchDto) {
+    try {
+      const results: { documentId: string; filename: string; success: boolean; error?: string }[] = [];
+
+      for (const doc of payload.documents) {
+        try {
+          if (!doc.enterpriseId) {
+            throw new Error('enterpriseId is required');
+          }
+
+          const buffer = Buffer.from(doc.buffer, 'base64');
+
+          const document = await this.document.create({
+            data: {
+              enterpriseId: doc.enterpriseId,
+              uploadedBy: doc.uploadedBy,
+              filename: doc.filename,
+              mimetype: doc.mimetype,
+              fileSize: buffer.byteLength,
+              hasDeliveryNotes: Boolean(doc.hasDeliveryNotes),
+              documentType: doc.documentType,
+              fileData: buffer,
+              status: 'PENDING',
+            },
+          });
+
+          void this.processDocument(document.id);
+
+          results.push({
+            documentId: document.id,
+            filename: doc.filename,
+            success: true,
+          });
+        } catch (error) {
+          this.logger.error(`Failed to create document ${doc.filename}:`, error);
+          results.push({
+            documentId: '',
+            filename: doc.filename,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      return {
+        total: payload.documents.length,
+        success: successCount,
+        failed: failureCount,
+        results,
+      };
     } catch (error) {
       throw this.handleError(error);
     }
@@ -144,40 +199,14 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   }
 
   async health() {
+    const pendingCount = await this.document.count({
+      where: { status: { in: ['PENDING', 'PROCESSING'] } },
+    });
+
     return {
       status: 'ok',
-      queued: this.queue.length,
-      activeJobs: this.activeJobs,
+      processing: pendingCount,
     };
-  }
-
-  private enqueue(documentId: string) {
-    this.queue.push(documentId);
-    void this.drainQueue();
-  }
-
-  private async drainQueue(): Promise<void> {
-    if (this.activeJobs >= envs.processingConcurrency) {
-      return;
-    }
-
-    const nextId = this.queue.shift();
-    if (!nextId) {
-      return;
-    }
-
-    this.activeJobs += 1;
-
-    try {
-      await this.processDocument(nextId);
-    } catch (error) {
-      this.logger.error(`Failed to process document ${nextId}`, error as Error);
-    } finally {
-      this.activeJobs -= 1;
-      if (this.queue.length > 0) {
-        void this.drainQueue();
-      }
-    }
   }
 
   private async processDocument(documentId: string): Promise<void> {
@@ -193,6 +222,8 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       data: { status: 'PROCESSING', errorReason: null },
     });
 
+    let blobName: string | null = null;
+
     try {
       if (!document.fileData) {
         throw new Error('El documento no contiene datos binarios para procesar');
@@ -202,7 +233,7 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
       const mimetype = document.mimetype || 'application/pdf';
 
       this.logger.log(`📤 Uploading document ${documentId} to blob storage...`);
-      const blobName = await this.azureBlob.uploadDocument(
+      blobName = await this.azureBlob.uploadDocument(
         documentId,
         buffer,
         mimetype,
@@ -224,9 +255,11 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         );
 
         if (invoiceExists.exists) {
-          throw new Error(
+          const error: any = new Error(
             `El documento ${document.documentType} con número ${az.InvoiceNumber} ya existe`,
           );
+          error.isDuplicate = true;
+          throw error;
         }
       }
 
@@ -295,11 +328,23 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
 
       this.logger.error(`Failed to process document ${documentId}`, err);
 
+      // Si hay un blob subido y es duplicado, eliminarlo
+      if (blobName && (error as any)?.isDuplicate) {
+        this.logger.warn(`🗑️ Deleting blob for duplicate document ${documentId}`);
+        try {
+          await this.azureBlob.deleteDocument(blobName);
+          this.logger.log(`✅ Blob ${blobName} deleted successfully`);
+        } catch (blobError) {
+          this.logger.error(`Failed to delete blob ${blobName}:`, blobError);
+        }
+      }
+
+      // Marcar documento como FAILED (no eliminar de BD para que el front pueda consultarlo)
       await this.document.update({
         where: { id: documentId },
         data: {
           status: 'FAILED',
-          errorReason: errorMessage.substring(0, 500), // Limitar longitud del mensaje
+          errorReason: errorMessage.substring(0, 500),
         },
       });
     }
@@ -353,21 +398,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         });
       }
     });
-  }
-
-  private async requeuePending(): Promise<void> {
-    const pending = await this.document.findMany({
-      where: {
-        status: {
-          in: ['PENDING', 'PROCESSING'],
-        },
-      },
-      select: { id: true },
-    });
-
-    for (const doc of pending) {
-      this.enqueue(doc.id);
-    }
   }
 
   private async checkInvoiceExists(
