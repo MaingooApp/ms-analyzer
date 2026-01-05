@@ -3,7 +3,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import { AnalyzerSubjects } from 'src/config';
 import { DocumentsService } from './documents.service';
-import { SubmitDocumentDto, GetDocumentDto } from './dto';
+import { SubmitDocumentDto, SubmitBatchDto, GetDocumentDto } from './dto';
 
 @Controller()
 export class DocumentsController {
@@ -12,6 +12,11 @@ export class DocumentsController {
   @MessagePattern(AnalyzerSubjects.submit)
   submit(@Payload() payload: SubmitDocumentDto) {
     return this.documentsService.submit(payload);
+  }
+
+  @MessagePattern(AnalyzerSubjects.submitBatch)
+  submitBatch(@Payload() payload: SubmitBatchDto) {
+    return this.documentsService.submitBatch(payload);
   }
 
   @MessagePattern(AnalyzerSubjects.getById)

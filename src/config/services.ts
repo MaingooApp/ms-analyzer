@@ -2,6 +2,7 @@ export const NATS_SERVICE = 'NATS_SERVICE';
 
 export const AnalyzerSubjects = {
   submit: 'analyzer.submit',
+  submitBatch: 'analyzer.submit.batch',
   getById: 'analyzer.getById',
   health: 'analyzer.health.check',
 } as const;
