@@ -88,7 +88,7 @@ export class AzureDocIntelService {
     documentUrl: string,
   ): Promise<AzureInvoiceExtraction | null> {
     try {
-      const url = `${this.endpoint}/contentunderstanding/analyzers/Analizer_GA:analyze?api-version=2025-11-01`;
+      const url = `${this.endpoint}/contentunderstanding/analyzers/InvoiceRouter:analyze?api-version=2025-11-01`;
 
       const body = {
         inputs: [
@@ -137,12 +137,15 @@ export class AzureDocIntelService {
         throw new Error(`Analysis failed, status: ${status}`);
       }
 
-      const content = resultJson.result?.contents?.[0];
-
+      const content = resultJson.result?.contents?.find(
+        (c: any) => c.category && c.fields
+      ) || resultJson.result?.contents?.[1] || resultJson.result?.contents?.[0];
+      
+      
       if (!content) return null;
-
+      
       const fields = content.fields as Record<string, CUField>;
-
+      
       const str = (f?: CUField) => f?.valueString ?? null;
       const num = (f?: CUField) => {
         if (typeof f?.valueNumber === 'number') return f.valueNumber;
@@ -198,6 +201,7 @@ export class AzureDocIntelService {
       extraction.Items = items.map((item) => {
         const o = obj(item) ?? {};
         const unitPrice = num(o['LinePrice']) ?? num(o['UnitPrice']);
+        const discount = num(o['Discount']);
         
         return {
           ProductCode: str(o['ProductCode']),
@@ -209,7 +213,7 @@ export class AzureDocIntelService {
           Quantity: num(o['Quantity']),
           LineAmount: num(o['LineAmount']),
           TaxIndicator: str(o['TaxIndicator']),
-          DiscountCode: str(o['DiscountCode']),
+          DiscountCode: (discount !== null ? String(discount) : null) ?? str(o['DiscountCode']),
           AdditionalReference: str(o['AdditionalReference']),
         };
       });
