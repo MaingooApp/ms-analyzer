@@ -64,8 +64,11 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
   async submitBatch(payload: SubmitBatchDto) {
     try {
       const results: { documentId: string; filename: string; success: boolean; error?: string }[] = [];
+      const STAGGER_DELAY_MS = 300; 
 
-      for (const doc of payload.documents) {
+      for (let i = 0; i < payload.documents.length; i++) {
+        const doc = payload.documents[i];
+        
         try {
           if (!doc.enterpriseId) {
             throw new Error('enterpriseId is required');
@@ -94,6 +97,10 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
             filename: doc.filename,
             success: true,
           });
+
+          if (i < payload.documents.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, STAGGER_DELAY_MS));
+          }
         } catch (error) {
           this.logger.error(`Failed to create document ${doc.filename}:`, error);
           results.push({
@@ -107,6 +114,10 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
 
       const successCount = results.filter((r) => r.success).length;
       const failureCount = results.filter((r) => !r.success).length;
+
+      this.logger.log(
+        `📦 Batch submitted: ${successCount} exitosos, ${failureCount} fallidos (${payload.documents.length} total)`,
+      );
 
       return {
         total: payload.documents.length,
@@ -320,7 +331,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
 
-      // Extraer mensaje más específico si viene de HttpException de NestJS
       let errorMessage = err.message;
       if ((error as any)?.response?.message) {
         errorMessage = (error as any).response.message;
@@ -328,7 +338,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
 
       this.logger.error(`Failed to process document ${documentId}`, err);
 
-      // Si hay un blob subido y es duplicado, eliminarlo
       if (blobName && (error as any)?.isDuplicate) {
         this.logger.warn(`🗑️ Deleting blob for duplicate document ${documentId}`);
         try {
@@ -339,7 +348,6 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
         }
       }
 
-      // Marcar documento como FAILED (no eliminar de BD para que el front pueda consultarlo)
       await this.document.update({
         where: { id: documentId },
         data: {
