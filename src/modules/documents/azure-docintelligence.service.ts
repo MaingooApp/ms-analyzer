@@ -81,11 +81,22 @@ export class AzureDocIntelService {
   private readonly logger = new Logger(AzureDocIntelService.name);
   private readonly endpoint = envs.cuEndpoint;
   private readonly key = envs.cuKey;
+  private readonly MAX_RETRIES = 3;
+  private readonly POLLING_INTERVAL_MS = 3000; 
 
   async analyzeInvoiceFromBuffer(
     buffer: Buffer,
     mimetype = 'application/pdf',
     documentUrl: string,
+  ): Promise<AzureInvoiceExtraction | null> {
+    return this.analyzeWithRetry(buffer, mimetype, documentUrl, 0);
+  }
+
+  private async analyzeWithRetry(
+    buffer: Buffer,
+    mimetype: string,
+    documentUrl: string,
+    retryCount: number,
   ): Promise<AzureInvoiceExtraction | null> {
     try {
       const url = `${this.endpoint}/contentunderstanding/analyzers/InvoiceRouter:analyze?api-version=2025-11-01`;
@@ -107,8 +118,24 @@ export class AzureDocIntelService {
         body: JSON.stringify(body),
       });
 
+      if (postResp.status === 429) {
+        const retryAfter = postResp.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : this.calculateBackoff(retryCount);
+        
+        if (retryCount < this.MAX_RETRIES) {
+          this.logger.warn(
+            `⏱️ Rate limit (429) alcanzado. Reintentando en ${waitTime}ms (intento ${retryCount + 1}/${this.MAX_RETRIES})`,
+          );
+          await this.sleep(waitTime);
+          return this.analyzeWithRetry(buffer, mimetype, documentUrl, retryCount + 1);
+        } else {
+          throw new Error(`Rate limit (429) superado después de ${this.MAX_RETRIES} reintentos`);
+        }
+      }
+
       if (!postResp.ok && postResp.status !== 202) {
-        throw new Error(await postResp.text());
+        const errorText = await postResp.text();
+        throw new Error(`Azure API error (${postResp.status}): ${errorText}`);
       }
 
       const operationLocation = postResp.headers.get('Operation-Location');
@@ -125,11 +152,19 @@ export class AzureDocIntelService {
           },
         });
 
+        if (getResp.status === 429) {
+          const retryAfter = getResp.headers.get('Retry-After');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000;
+          this.logger.warn(`⏱️ Rate limit en polling. Esperando ${waitTime}ms`);
+          await this.sleep(waitTime);
+          continue;
+        }
+
         resultJson = await getResp.json();
         status = resultJson.status;
 
         if (status === 'Running' || status === 'NotStarted') {
-          await new Promise((r) => setTimeout(r, 1200));
+          await this.sleep(this.POLLING_INTERVAL_MS);
         }
       }
 
@@ -242,5 +277,17 @@ export class AzureDocIntelService {
       this.logger.error(msg);
       throw new InternalServerErrorException(msg);
     }
+  }
+
+
+  private calculateBackoff(retryCount: number): number {
+    const baseDelay = 5000; 
+    const exponentialDelay = baseDelay * Math.pow(2, retryCount); 
+    const jitter = Math.random() * 2000 * (retryCount + 1); 
+    return exponentialDelay + jitter;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
