@@ -82,7 +82,7 @@ export class AzureDocIntelService {
   private readonly endpoint = envs.cuEndpoint;
   private readonly key = envs.cuKey;
   private readonly MAX_RETRIES = 3;
-  private readonly POLLING_INTERVAL_MS = 3000; 
+  private readonly POLLING_INTERVAL_MS = 3000;
 
   async analyzeInvoiceFromBuffer(
     buffer: Buffer,
@@ -120,8 +120,10 @@ export class AzureDocIntelService {
 
       if (postResp.status === 429) {
         const retryAfter = postResp.headers.get('Retry-After');
-        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : this.calculateBackoff(retryCount);
-        
+        const waitTime = retryAfter
+          ? parseInt(retryAfter) * 1000
+          : this.calculateBackoff(retryCount);
+
         if (retryCount < this.MAX_RETRIES) {
           this.logger.warn(
             `⏱️ Rate limit (429) alcanzado. Reintentando en ${waitTime}ms (intento ${retryCount + 1}/${this.MAX_RETRIES})`,
@@ -172,21 +174,32 @@ export class AzureDocIntelService {
         throw new Error(`Analysis failed, status: ${status}`);
       }
 
-      const content = resultJson.result?.contents?.find(
-        (c: any) => c.category && c.fields
-      ) || resultJson.result?.contents?.[1] || resultJson.result?.contents?.[0];
-      
-      
+      const content =
+        resultJson.result?.contents?.find((c: any) => c.category && c.fields) ||
+        resultJson.result?.contents?.[1] ||
+        resultJson.result?.contents?.[0];
+
       if (!content) return null;
-      
+
       const fields = content.fields as Record<string, CUField>;
-      
+
       const str = (f?: CUField) => f?.valueString ?? null;
       const num = (f?: CUField) => {
         if (typeof f?.valueNumber === 'number') return f.valueNumber;
         if (typeof f?.valueInteger === 'number') return f.valueInteger;
         return null;
       };
+
+      const parseEuropeanPrice = (f?: CUField): number | null => {
+        const strValue = str(f);
+        if (!strValue) return null;
+
+        const normalized = strValue.replace(',', '.');
+        const parsed = parseFloat(normalized);
+
+        return isNaN(parsed) ? null : parsed;
+      };
+
       const dateI = (f?: CUField) => (f?.valueDate ? new Date(f.valueDate).toISOString() : null);
       const obj = (f?: CUField) => f?.valueObject ?? null;
       const arr = (f?: CUField) => f?.valueArray ?? null;
@@ -235,9 +248,9 @@ export class AzureDocIntelService {
       const items = arr(fields['Items']) ?? [];
       extraction.Items = items.map((item) => {
         const o = obj(item) ?? {};
-        const unitPrice = num(o['LinePrice']) ?? num(o['UnitPrice']);
+        const unitPrice = parseEuropeanPrice(o['UnitPrice']);
         const discount = num(o['Discount']);
-        
+
         return {
           ProductCode: str(o['ProductCode']),
           ProductDescription: str(o['ProductDescription']),
@@ -279,11 +292,10 @@ export class AzureDocIntelService {
     }
   }
 
-
   private calculateBackoff(retryCount: number): number {
-    const baseDelay = 5000; 
-    const exponentialDelay = baseDelay * Math.pow(2, retryCount); 
-    const jitter = Math.random() * 2000 * (retryCount + 1); 
+    const baseDelay = 5000;
+    const exponentialDelay = baseDelay * Math.pow(2, retryCount);
+    const jitter = Math.random() * 2000 * (retryCount + 1);
     return exponentialDelay + jitter;
   }
 
