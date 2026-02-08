@@ -1,16 +1,19 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "DocumentStatus" AS ENUM ('PENDING', 'PROCESSING', 'DONE', 'FAILED');
 
 -- CreateTable
 CREATE TABLE "Document" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "enterpriseId" TEXT NOT NULL,
     "uploadedBy" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
     "mimetype" TEXT NOT NULL,
     "fileSize" INTEGER NOT NULL,
     "documentType" TEXT,
-    "hasDeliveryNotes" BOOLEAN NOT NULL,
+    "hasDeliveryNotes" BOOLEAN NOT NULL DEFAULT false,
     "status" "DocumentStatus" NOT NULL DEFAULT 'PENDING',
     "errorReason" TEXT,
     "processedAt" TIMESTAMP(3),
@@ -25,14 +28,14 @@ CREATE TABLE "Document" (
 
 -- CreateTable
 CREATE TABLE "Extraction" (
-    "id" TEXT NOT NULL,
-    "documentId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "documentId" UUID NOT NULL,
     "supplierName" TEXT,
     "supplierTaxId" TEXT,
     "invoiceNumber" TEXT,
     "issueDate" TIMESTAMP(3),
-    "totalAmount" DECIMAL(65,30),
-    "taxAmount" DECIMAL(65,30),
+    "totalAmount" DECIMAL(12,2),
+    "taxAmount" DECIMAL(12,2),
     "currency" TEXT,
     "rawResponse" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -43,12 +46,19 @@ CREATE TABLE "Extraction" (
 
 -- CreateTable
 CREATE TABLE "LineItem" (
-    "id" TEXT NOT NULL,
-    "extractionId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "extractionId" UUID NOT NULL,
+    "productCode" TEXT,
     "description" TEXT,
-    "quantity" DECIMAL(65,30),
-    "unitPrice" DECIMAL(65,30),
-    "total" DECIMAL(65,30),
+    "productUnit" TEXT,
+    "unitCount" TEXT,
+    "quantity" DECIMAL(10,3),
+    "unitPrice" DECIMAL(12,2),
+    "linePrice" DECIMAL(12,2),
+    "total" DECIMAL(12,2),
+    "taxIndicator" TEXT,
+    "discountCode" TEXT,
+    "additionalReference" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "LineItem_pkey" PRIMARY KEY ("id")
@@ -74,3 +84,4 @@ ALTER TABLE "Extraction" ADD CONSTRAINT "Extraction_documentId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "LineItem" ADD CONSTRAINT "LineItem_extractionId_fkey" FOREIGN KEY ("extractionId") REFERENCES "Extraction"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
