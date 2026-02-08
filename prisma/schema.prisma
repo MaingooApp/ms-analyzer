@@ -16,7 +16,7 @@ enum DocumentStatus {
 
 // Documento temporal para extracción con IA
 model Document {
-  id          String          @id @default(cuid())
+  id          String          @id @default(uuid()) @db.Uuid
   enterpriseId  String
   uploadedBy  String
   filename    String
@@ -42,9 +42,9 @@ model Document {
 
 // Extracción temporal de la IA (se mapea a Invoice después)
 model Extraction {
-  id             String      @id @default(cuid())
+  id             String      @id @default(uuid()) @db.Uuid
   document       Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  documentId     String      @unique
+  documentId     String      @unique @db.Uuid
   supplierName   String?
   supplierTaxId  String?
   invoiceNumber  String?
@@ -60,9 +60,9 @@ model Extraction {
 }
 
 model LineItem {
-  id                  String     @id @default(cuid())
+  id                  String     @id @default(uuid()) @db.Uuid
   extraction          Extraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
-  extractionId        String
+  extractionId        String  @db.Uuid
   productCode         String?
   description         String?
   productUnit         String?
