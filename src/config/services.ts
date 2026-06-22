@@ -4,6 +4,7 @@ export const AnalyzerSubjects = {
   submit: 'analyzer.submit',
   submitBatch: 'analyzer.submit.batch',
   getById: 'analyzer.getById',
+  getUsage: 'analyzer.usage.get',
   health: 'analyzer.health.check',
 } as const;
 
