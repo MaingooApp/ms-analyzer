@@ -45,6 +45,14 @@ export class DocumentsController {
     return this.documentsService.getById({ ...request.data, enterpriseId });
   }
 
+  @MessagePattern(AnalyzerSubjects.getUsage)
+  getUsage(@Payload() payload: unknown) {
+    const request = extractToolRequest<{ enterpriseId?: string }>(payload);
+    requireToolPermission(request.context, 'documents.write');
+    const enterpriseId = resolveToolEnterpriseId(request.context, request.data.enterpriseId);
+    return this.documentsService.getUsage({ enterpriseId });
+  }
+
   @MessagePattern(AnalyzerSubjects.health)
   health() {
     return this.documentsService.health();

@@ -196,6 +196,18 @@ export class DocumentsService extends PrismaClient implements OnModuleInit, OnMo
     }
   }
 
+  async getUsage(payload: { enterpriseId: string }) {
+    try {
+      const documents = await this.document.count({
+        where: { enterpriseId: payload.enterpriseId },
+      });
+
+      return { documents };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   async updateDocumentInvoiceId(documentId: string, invoiceId: string) {
     try {
       await this.document.update({
