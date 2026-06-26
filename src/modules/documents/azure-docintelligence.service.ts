@@ -74,7 +74,82 @@ export type AzureInvoiceExtraction = {
   }>;
 
   raw: any;
+  usage: AzureTokenUsageSnapshot | null;
 };
+
+export type AzureTokenUsageEntry = {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+};
+
+export type AzureTokenUsageSnapshot = {
+  documentPagesStandard: number | null;
+  contextualizationTokens: number | null;
+  rawUsage: Record<string, unknown>;
+  entries: AzureTokenUsageEntry[];
+};
+
+export function parseAzureTokenUsage(value: unknown): AzureTokenUsageSnapshot | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const usage = value as Record<string, unknown>;
+  const tokens = usage['tokens'];
+  if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) {
+    return null;
+  }
+
+  const byModel = new Map<string, { inputTokens: number; outputTokens: number }>();
+
+  for (const [key, rawValue] of Object.entries(tokens)) {
+    if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+      continue;
+    }
+
+    const suffix = key.endsWith('-input') ? '-input' : key.endsWith('-output') ? '-output' : null;
+    if (!suffix) {
+      continue;
+    }
+
+    const model = key.slice(0, -suffix.length);
+    if (!model) {
+      continue;
+    }
+
+    const current = byModel.get(model) ?? { inputTokens: 0, outputTokens: 0 };
+    if (suffix === '-input') {
+      current.inputTokens += rawValue;
+    } else {
+      current.outputTokens += rawValue;
+    }
+    byModel.set(model, current);
+  }
+
+  const entries = Array.from(byModel.entries()).map(([model, totals]) => ({
+    model,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    totalTokens: totals.inputTokens + totals.outputTokens,
+  }));
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return {
+    documentPagesStandard: readUsageNumber(usage['documentPagesStandard']),
+    contextualizationTokens: readUsageNumber(usage['contextualizationTokens']),
+    rawUsage: usage,
+    entries,
+  };
+}
+
+function readUsageNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
 @Injectable()
 export class AzureDocIntelService {
@@ -243,6 +318,7 @@ export class AzureDocIntelService {
         TaxSummary: [],
 
         raw: resultJson.result,
+        usage: parseAzureTokenUsage(resultJson.usage),
       };
 
       const items = arr(fields['Items']) ?? [];

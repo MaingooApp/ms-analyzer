@@ -34,10 +34,32 @@ model Document {
   updatedAt   DateTime        @updatedAt
 
   extraction  Extraction?
+  tokenUsage  DocumentTokenUsage[]
 
   @@index([enterpriseId])
   @@index([status])
   @@index([invoiceId])
+}
+
+model DocumentTokenUsage {
+  id                      String   @id @default(uuid()) @db.Uuid
+  document                Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId              String   @db.Uuid
+  invoiceId               String?
+  enterpriseId            String
+  model                   String
+  inputTokens             Int
+  outputTokens            Int
+  totalTokens             Int
+  documentPagesStandard   Int?
+  contextualizationTokens Int?
+  rawUsage                Json?
+  createdAt               DateTime @default(now())
+
+  @@unique([documentId, model])
+  @@index([enterpriseId])
+  @@index([invoiceId])
+  @@index([documentId])
 }
 
 // Extracción temporal de la IA (se mapea a Invoice después)

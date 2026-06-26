@@ -48,7 +48,7 @@ export class DocumentsController {
   @MessagePattern(AnalyzerSubjects.getUsage)
   getUsage(@Payload() payload: unknown) {
     const request = extractToolRequest<{ enterpriseId?: string }>(payload);
-    requireToolPermission(request.context, 'documents.write');
+    requireToolPermission(request.context, 'documents.read');
     const enterpriseId = resolveToolEnterpriseId(request.context, request.data.enterpriseId);
     return this.documentsService.getUsage({ enterpriseId });
   }
